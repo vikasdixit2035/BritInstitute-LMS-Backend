@@ -19,6 +19,7 @@ import foundationRoutes from './routes/foundation.routes';
 import studyMaterialRoutes from './routes/studyMaterial.routes';
 import projectRoutes from './routes/project.routes';
 import { startAttendanceJob } from './jobs/attendance.job';
+import { startBookingEmailJob } from './jobs/bookingEmail.job';
 
 const app: Application = express();
 const allowedOrigins = Array.from(new Set([
@@ -73,6 +74,7 @@ app.use((_req: Request, res: Response) => {
 const start = async (): Promise<void> => {
   await connectDB();
   startAttendanceJob();
+  startBookingEmailJob();
   app.listen(config.port, () => {
     console.log(`🚀 Server running on http://localhost:${config.port}`);
     console.log(`🌍 Environment: ${config.nodeEnv}`);

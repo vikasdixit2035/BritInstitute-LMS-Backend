@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "nodemon --exec ts-node src/app.ts",
     "build": "tsc",
+    "test:recordings": "npm run build && node --test scripts/recording-playback.test.cjs",
+    "test:booking-emails": "npm run build && node --test scripts/booking-email.test.cjs",
+    "test:booking-emails:live": "npm run build && node scripts/booking-email-live.cjs",
     "start": "node dist/app.js",
     "seed": "ts-node src/seed.ts",
     "seed:projects": "ts-node src/scripts/seedProjects.ts",
@@ -34,6 +37,7 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^20.14.2",
     "@types/node-cron": "^3.0.11",
+    "mongodb-memory-server": "^10.4.3",
     "nodemon": "^3.1.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"

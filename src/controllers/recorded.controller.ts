@@ -10,6 +10,7 @@ import { config } from '../config/env';
 import { fetchZoomRecordingFile, ZoomApiError } from '../services/zoom.service';
 import { syncPendingZoomRecordings, syncZoomRecordingForLiveClass } from '../services/recordedLectureSync.service';
 import { LiveClass } from '../models/LiveClass.model';
+import { findLocalZoomRecording, isVideoStreamResponse } from '../services/recordingPlayback.service';
 
 type RequestUser = NonNullable<AuthRequest['user']>;
 type PlaybackMode = 'protected_stream' | 'blocked_external';
@@ -325,6 +326,32 @@ export const streamLecture = async (req: AuthRequest, res: Response): Promise<vo
         return;
       }
 
+      const localRecording = await findLocalZoomRecording(lecture.zoomRecordingFileId);
+      if (localRecording) {
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Disposition', 'inline');
+        res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        // Express handles byte ranges, HEAD requests and seeking for this file.
+        res.sendFile(localRecording, { dotfiles: 'deny', lastModified: false, etag: false }, (error) => {
+          if (!error || res.destroyed) return;
+          if (res.headersSent) {
+            res.destroy();
+          } else {
+            res.removeHeader('Content-Length');
+            res.removeHeader('Content-Type');
+            const status = (error as { status?: number }).status === 416 ? 416 : 502;
+            if (status !== 416) res.removeHeader('Content-Range');
+            res.status(status)
+              .json({ success: false, message: 'Unable to stream the saved recording' });
+          }
+        });
+        return;
+      }
+
       if (!lecture.zoomDownloadUrl) {
         res.status(409).json({ success: false, message: 'Zoom recording is still processing' });
         return;
@@ -367,7 +394,8 @@ export const streamLecture = async (req: AuthRequest, res: Response): Promise<vo
       headers: req.headers.range ? { Range: req.headers.range } : undefined,
     });
 
-    if (!upstreamResponse.ok && upstreamResponse.status !== 206) {
+    if ((!upstreamResponse.ok && upstreamResponse.status !== 206) || !isVideoStreamResponse(upstreamResponse)) {
+      await upstreamResponse.body?.cancel();
       res.status(502).json({ success: false, message: 'Unable to stream recorded lecture' });
       return;
     }

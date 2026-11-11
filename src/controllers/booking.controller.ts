@@ -4,6 +4,7 @@ import { Booking } from '../models/Booking.model';
 import { User } from '../models/User.model';
 import { createZoomMeeting, deleteZoomMeeting, updateZoomMeeting, ZoomApiError } from '../services/zoom.service';
 import { formatUkTime, getUkDateBounds, parseUkDate, parseUkDateTime } from '../utils/ukTime';
+import { createBookingEmails, dispatchBookingEmails, resetBookingReminders } from '../services/bookingEmail.service';
 
 const BOOKING_SLOT_STATUSES = ['pending', 'accepted'] as const;
 const DEFAULT_SLOT_MINUTES = 30;
@@ -208,9 +209,11 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
       topic: String(topic).trim(),
       dateTime: startTime,
       duration,
-      status: 'pending'
+      status: 'pending',
+      emailNotifications: createBookingEmails(startTime),
     });
 
+    dispatchBookingEmails(String(booking._id));
     const populatedBooking = await populateBooking(String(booking._id));
     res.status(201).json({ success: true, booking: populatedBooking });
   } catch (err) {
@@ -278,7 +281,7 @@ export const rescheduleBooking = async (req: AuthRequest, res: Response): Promis
     const { id } = req.params;
     const student = req.user!.id;
 
-    const booking = await Booking.findOne({ _id: id, student });
+    const booking = await Booking.findOne({ _id: id, student }).select('+emailNotifications');
     if (!booking) {
       res.status(404).json({ success: false, message: 'Booking not found' });
       return;
@@ -320,13 +323,16 @@ export const rescheduleBooking = async (req: AuthRequest, res: Response): Promis
       await clearZoomDetails(booking);
     }
 
+    const scheduleChanged = booking.dateTime.getTime() !== startTime.getTime();
     booking.mentor = mentorExists._id;
     booking.topic = topic;
     booking.dateTime = startTime;
     booking.duration = duration;
     booking.status = 'pending';
+    if (scheduleChanged) resetBookingReminders(booking);
     await booking.save();
 
+    dispatchBookingEmails(String(booking._id));
     const populatedBooking = await populateBooking(String(booking._id));
     res.json({
       success: true,
@@ -360,7 +366,7 @@ export const adminUpdateBooking = async (req: AuthRequest, res: Response): Promi
     const { id } = req.params;
     const { status, meetingLink } = req.body;
 
-    const booking = await Booking.findById(id);
+    const booking = await Booking.findById(id).select('+emailNotifications');
     if (!booking) {
       res.status(404).json({ success: false, message: 'Booking not found' });
       return;
@@ -406,6 +412,7 @@ export const adminUpdateBooking = async (req: AuthRequest, res: Response): Promi
       booking.mentor = mentorExists._id;
     }
 
+    const scheduleChanged = booking.dateTime.getTime() !== nextStartTime.getTime();
     booking.topic = nextTopic;
     booking.dateTime = nextStartTime;
     booking.duration = nextDuration;
@@ -450,7 +457,9 @@ export const adminUpdateBooking = async (req: AuthRequest, res: Response): Promi
 
     if (status) booking.status = status;
 
+    if (scheduleChanged) resetBookingReminders(booking);
     await booking.save();
+    dispatchBookingEmails(String(booking._id));
     const populatedBooking = await populateBooking(String(booking._id));
     res.json({ success: true, booking: populatedBooking });
   } catch (err) {

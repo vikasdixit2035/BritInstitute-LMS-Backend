@@ -1,4 +1,5 @@
 import { config } from '../config/env';
+import { isVideoStreamResponse } from './recordingPlayback.service';
 import { formatUkMeetingRange, getUkZoomDateTimeValue, UK_TIME_ZONE } from '../utils/ukTime';
 
 interface ZoomTokenResponse {
@@ -1007,6 +1008,11 @@ export const fetchZoomRecordingFile = async (downloadUrl: string, range?: string
     throw new ZoomApiError(message, response.status);
   }
 
+  if (!isVideoStreamResponse(response)) {
+    await response.body?.cancel();
+    throw new ZoomApiError('Zoom did not return a video file. The cloud recording may be unavailable. Please contact support.', 502);
+  }
+
   return response;
 };
 
@@ -1031,6 +1037,11 @@ export const fetchZoomPublicRecordingFile = async (
   if (!response.ok && response.status !== 206) {
     const message = await getZoomErrorMessage(response, 'Unable to stream Zoom recording.');
     throw new ZoomApiError(message, response.status);
+  }
+
+  if (!isVideoStreamResponse(response)) {
+    await response.body?.cancel();
+    throw new ZoomApiError('Zoom did not return a video file. The cloud recording may be unavailable. Please contact support.', 502);
   }
 
   return response;

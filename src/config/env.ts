@@ -9,6 +9,7 @@ export const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   inactivityTimeoutMinutes: Number(process.env.INACTIVITY_TIMEOUT_MINUTES || 30),
+  resendApiKey: process.env.RESEND_API_KEY || '',
   zoom: {
     accountId: process.env.ZOOM_ACCOUNT_ID || '',
     clientId: process.env.ZOOM_CLIENT_ID || '',

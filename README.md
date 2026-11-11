@@ -58,6 +58,9 @@ ZOOM_ACCOUNT_ID=
 ZOOM_CLIENT_ID=
 ZOOM_CLIENT_SECRET=
 ZOOM_WEBHOOK_SECRET_TOKEN=
+
+# 1:1 appointment confirmations and reminders
+RESEND_API_KEY=
 ```
 
 Important notes:
@@ -65,6 +68,30 @@ Important notes:
 - Never commit real `.env` secrets to GitHub.
 - `INACTIVITY_TIMEOUT_MINUTES` is optional. If not provided, the API defaults to 30 minutes.
 - `ZOOM_*` values are required only if you want automatic Zoom meeting creation and updates.
+- `RESEND_API_KEY` enables appointment emails. Verify `britinstitute.uk` in Resend; both sender and office recipient are `info@britinstitute.uk`.
+
+## 1:1 Appointment Emails
+
+Each new learner booking stores four durable email notifications in the same MongoDB document as the booking:
+
+- On booking: one confirmation to the learner's profile email, one to `info@britinstitute.uk`.
+- Two hours before the session: one reminder to each recipient, for pending or accepted appointments.
+
+Times in emails use `Europe/London`, including daylight saving time. A booking made less than two hours before the session sends its reminders immediately. Pending requests are clearly labelled as awaiting approval. Accepted-session reminders include the participant meeting link, never the host start URL.
+
+The backend attempts confirmations immediately after saving a booking. A job runs at startup and every minute to deliver due notifications and retry failures, so reminders normally arrive within one minute of the two-hour mark. The backend process must remain running. Cancelled, completed and past sessions are skipped. Student and admin rescheduling replace reminders for the old time; confirmations are not sent again. Existing bookings are not backfilled automatically; rescheduling an existing booking creates its new reminders.
+
+Delivery is tracked separately for each recipient, with atomic worker claims and stable Resend idempotency keys. Payloads are frozen before the first attempt, so retries use an identical request. Ambiguous retries stop after 23 hours because Resend retains idempotency keys for 24 hours; inspect provider history before manually retrying such a failed notification. Provider failures never undo a booking. A missing/invalid learner email leaves that recipient queued for a profile correction while the office notification can still send. Email state and payloads are excluded from ordinary booking API responses.
+
+A shared MongoDB daily counter caps this feature at 100 distinct email attempts per UTC day, including uncertain delivery attempts. Excess notifications wait until the next UTC day and are skipped if their session has already started. Four emails consume four recipient slots; this is at most 25 complete booking email cycles per day if all four fall on that day. Other applications using the same Resend account also consume its provider quota. Quota exhaustion or provider outages can delay emails past their intended time; increase the Resend allowance if needed. Daily/monthly provider quota errors and rate limits remain queued and are logged.
+
+Enable on the server by setting `RESEND_API_KEY`, running `npm run build`, and restarting the existing backend process. No frontend change or manual database migration is required. Keep the key in the server's environment or ignored `.env` file.
+
+### Email verification
+
+`npm run test:booking-emails` uses the real authenticated Express booking routes, an isolated disposable MongoDB, and a local HTTP fixture for Resend. No live learner records or email accounts are touched. The fixture follows the official [send-email contract](https://resend.com/docs/api-reference/emails/send-email), [errors](https://resend.com/docs/api-reference/errors), and [idempotency contract](https://resend.com/docs/dashboard/emails/idempotency-keys). It verifies booking confirmations, reminder timing, independent retries, lost-response deduplication, worker concurrency, rescheduling, cancellation, quota behavior, missing email recovery, and existing route permissions/conflicts. Postman CLI is not installed in this workspace; the repeatable local HTTP fixture exercises these provider interactions with Node's native HTTP client.
+
+For a deliberately live check, run `npm run test:booking-emails:live -- --send-live-test-emails`. This sends exactly four real emails from `info@britinstitute.uk`: confirmations and reminders to `hhimanshu030@gmail.com` and `info@britinstitute.uk`. It uses an isolated database, labels the topic as an automated test, advances only the reminder worker's clock, and reads provider delivery events when permitted by the key. The first test run may download MongoDB's test binary. A passing local fixture test proves the application behavior against that fixture; the live check additionally establishes provider acceptance/delivery.
 
 ## Installation
 
