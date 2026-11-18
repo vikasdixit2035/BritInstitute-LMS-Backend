@@ -1,13 +1,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const express = require('express');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
 test('email code resets the password once and the new credentials sign in', async t => {
   process.env.RESEND_API_KEY = 'local-test';
+  process.env.NODE_ENV = 'test';
   const { User } = require('../dist/models/User.model');
-  const routes = require('../dist/routes/auth.routes').default;
+  const { app } = require('../dist/app');
   const mongo = await MongoMemoryServer.create({ binary: { version: '7.0.24' } });
   t.after(async () => { await mongoose.disconnect(); await mongo.stop(); });
   await mongoose.connect(mongo.getUri());
@@ -17,9 +17,6 @@ test('email code resets the password once and the new credentials sign in', asyn
   const newPassword = 'ReplacementPass2';
   await User.create({ name: 'Test Student', username, email, password: oldPassword, password2: 'legacy-test-field' });
 
-  const app = express();
-  app.use(express.json());
-  app.use('/auth', routes);
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   t.after(() => new Promise(resolve => server.close(resolve)));
@@ -32,11 +29,13 @@ test('email code resets the password once and the new credentials sign in', asyn
     mail.push(JSON.parse(options.body));
     return Response.json({ id: 'mock-email' });
   });
-  const post = (route, body) => http(`http://127.0.0.1:${server.address().port}/auth/${route}`, {
+  const post = (route, body) => http(`http://127.0.0.1:${server.address().port}/api/auth/${route}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   const request = () => post('forgot-password', { username });
   const reset = otp => post('reset-password', { username, otp, newPassword });
+  assert.equal((await post('forgot-password', {})).status, 400);
+  assert.equal((await post('reset-password', {})).status, 400);
   const unknown = await post('forgot-password', { username: 'missing' });
   assert.equal(mail.length, 0);
   assert.equal((await request()).status, 503);
@@ -46,6 +45,7 @@ test('email code resets the password once and the new credentials sign in', asyn
   assert.equal(mail.length, 1);
   assert.deepEqual(mail[0].to, [email]);
   const code = () => mail.at(-1).text.match(/\b\d{6}\b/)[0];
+  assert.equal((await post('reset-password', { username, otp: code(), newPassword: 'weak' })).status, 400);
   const wrong = code() === '000000' ? '111111' : '000000';
   for (let i = 0; i < 5; i++) assert.equal((await reset(wrong)).status, 400);
   assert.equal((await reset(code())).status, 400);

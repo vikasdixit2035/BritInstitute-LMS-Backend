@@ -21,7 +21,7 @@ import projectRoutes from './routes/project.routes';
 import { startAttendanceJob } from './jobs/attendance.job';
 import { startBookingEmailJob } from './jobs/bookingEmail.job';
 
-const app: Application = express();
+export const app: Application = express();
 const allowedOrigins = Array.from(new Set([
   config.frontendUrl,
   'http://localhost:5173',
@@ -81,7 +81,9 @@ const start = async (): Promise<void> => {
   });
 };
 
-start().catch((err) => {
-  console.error('❌ Failed to start server:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  start().catch((err) => {
+    console.error('❌ Failed to start server:', err);
+    process.exit(1);
+  });
+}

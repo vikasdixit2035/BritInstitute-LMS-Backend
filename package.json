@@ -10,6 +10,8 @@
     "test:recordings": "npm run build && node --test scripts/recording-playback.test.cjs",
     "test:booking-emails": "npm run build && node --test scripts/booking-email.test.cjs",
     "test:booking-emails:live": "npm run build && node scripts/booking-email-live.cjs",
+    "test:password-reset": "npm run build && node --test scripts/password-reset.test.cjs",
+    "check:password-reset": "node scripts/check-password-reset.cjs",
     "start": "node dist/app.js",
     "seed": "ts-node src/seed.ts",
     "seed:projects": "ts-node src/scripts/seedProjects.ts",

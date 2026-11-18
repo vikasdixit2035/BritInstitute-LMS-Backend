@@ -93,6 +93,17 @@ Enable on the server by setting `RESEND_API_KEY`, running `npm run build`, and r
 
 For a deliberately live check, run `npm run test:booking-emails:live -- --send-live-test-emails`. This sends exactly four real emails from `info@britinstitute.uk`: confirmations and reminders to `hhimanshu030@gmail.com` and `info@britinstitute.uk`. It uses an isolated database, labels the topic as an automated test, advances only the reminder worker's clock, and reads provider delivery events when permitted by the key. The first test run may download MongoDB's test binary. A passing local fixture test proves the application behavior against that fixture; the live check additionally establishes provider acceptance/delivery.
 
+## Password reset deployment check
+
+Build and restart the LMS backend with `RESEND_API_KEY` configured before enabling the matching frontend. The backend sends reset codes to active accounts with a registered email address. The frontend's `VITE_API_URL` must point to this backend's public API base, including `/api`.
+
+```bash
+npm run test:password-reset
+npm run check:password-reset -- https://lms.britinstitute.uk/api
+```
+
+The first command tests the compiled app with temporary MongoDB and simulated email delivery. The second sends empty requests to the public API. Both reset endpoints should return HTTP 400 for empty input. If either returns 404, check which backend build the public `/api` route forwards to and restart that service with the current build.
+
 ## Installation
 
 ```bash
