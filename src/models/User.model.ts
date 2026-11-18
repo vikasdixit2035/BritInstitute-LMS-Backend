@@ -6,6 +6,7 @@ export interface IUser extends Document {
   username: string;
   password2: string;
   password: string;
+  passwordReset?: { digest: string; expiresAt: Date; sentAt: Date; attempts: number };
   role: 'superadmin' | 'admin' | 'teacher' | 'student';
   phone?: string;
   email?: string;
@@ -23,6 +24,12 @@ const userSchema = new Schema<IUser>(
     password: { type: String, required: true, select: false },
     // new update
     password2: { type: String, required: true, select: false },
+    passwordReset: {
+      type: new Schema({
+        digest: String, expiresAt: Date, sentAt: Date, attempts: Number,
+      }, { _id: false }),
+      select: false,
+    },
     role: { type: String, enum: ['superadmin', 'admin', 'teacher', 'student'], default: 'student' },
     phone: { type: String, trim: true, default: '' },
     email: { type: String, trim: true, lowercase: true },

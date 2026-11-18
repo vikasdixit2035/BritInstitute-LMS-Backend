@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { changePassword, getMe, getSessionConfig, heartbeat, login, logoutSession } from '../controllers/auth.controller';
 import { protect } from '../middleware/auth.middleware';
+import { requestPasswordReset, resetPassword } from '../controllers/passwordReset.controller';
 
 const router = Router();
 
 router.get('/session-config', getSessionConfig);
 router.post('/login', login);
+router.post('/forgot-password', requestPasswordReset);
+router.post('/reset-password', resetPassword);
 router.get('/me', protect, getMe);
 router.put('/password', protect, changePassword);
 router.post('/heartbeat', protect, heartbeat);
