@@ -68,7 +68,8 @@ export async function resetPassword(req: Request, res: Response) {
     // Query updates bypass the User save hook. Hash before consuming the code atomically.
     const password = await bcrypt.hash(newPassword, 10);
     const result = await User.updateOne({ ...challenge, 'passwordReset.expiresAt': { $gt: new Date() } },
-      { $set: { password }, $unset: { passwordReset: 1 } });
+      // Keep password2 in sync, matching changePassword and the admin password update.
+      { $set: { password, password2: newPassword }, $unset: { passwordReset: 1 } });
     if (!result.modifiedCount) return res.status(400).json(invalidCode);
     return res.json({ success: true, message: 'Password updated. Sign in with your new password.' });
   } catch {

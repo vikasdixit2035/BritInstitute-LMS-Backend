@@ -57,6 +57,7 @@ test('email code resets the password once and the new credentials sign in', asyn
   assert.equal((await reset(code())).status, 400);
   assert.equal((await post('login', { username, password: oldPassword })).status, 401);
   assert.ok((await (await post('login', { username, password: newPassword })).json()).token);
+  assert.equal((await User.findOne({ username }).select('+password2')).password2, newPassword);
   await request();
   await User.updateOne({ username }, { $set: { 'passwordReset.expiresAt': new Date(0) } });
   assert.equal((await reset(code())).status, 400);
