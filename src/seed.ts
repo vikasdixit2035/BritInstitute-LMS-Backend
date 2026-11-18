@@ -1,3 +1,4 @@
+import { config } from './config/env';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import { Course } from './models/Course.model';
@@ -7,7 +8,7 @@ import { User } from './models/User.model';
 dotenv.config();
 
 // const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/britInstiuteLMS';
- const MONGO_URI: process.env.MONGO_URI || "mongodb+srv://sandeep_db_user:Edtech%404545@cluster0.el7dlkr.mongodb.net/?retryWrites=true&w=majority";
+const MONGO_URI = config.mongoUri;
 
 const PROGRAM_TITLE = 'Data Analyst and Applied GenAI Certification Program';
 const PROGRAM_DESCRIPTION =
