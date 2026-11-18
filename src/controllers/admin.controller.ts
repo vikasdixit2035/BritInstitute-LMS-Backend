@@ -20,6 +20,8 @@ import {
 // ─── Users ──────────────────────────────────────────────────────────────────
 
 export const createUser = async (req: AuthRequest, res: Response): Promise<void> => {
+
+
   try {
     const name = normalizeName(req.body.name);
     const username = normalizeUsername(req.body.username);
@@ -66,15 +68,26 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
       }
     }
 
+    // const user = await User.create({
+    //   name,
+    //   username,
+    //   password,
+    //   role: 'student',
+    //   enrolledCourse: enrolledCourse || undefined,
+    //   phone: normalizedPhone,
+    //   email: normalizedEmail || undefined,
+    // });
+
     const user = await User.create({
-      name,
-      username,
-      password,
-      role: 'student',
-      enrolledCourse: enrolledCourse || undefined,
-      phone: normalizedPhone,
-      email: normalizedEmail || undefined,
-    });
+  name,
+  username,
+  password,             // Will be hashed by pre-save middleware
+  password2: password,  // Stores original password
+  role: 'student',
+  enrolledCourse: enrolledCourse || undefined,
+  phone: normalizedPhone,
+  email: normalizedEmail || undefined,
+});
     res.status(201).json({
       success: true,
       user: {
@@ -122,7 +135,9 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     const username = req.body.username !== undefined ? normalizeUsername(req.body.username) : undefined;
     const normalizedPhone = req.body.phone !== undefined ? normalizePhone(req.body.phone) : undefined;
     const normalizedEmail = req.body.email !== undefined ? normalizeEmail(req.body.email) : undefined;
-    const user = await User.findById(id).select('+password');
+    // const user = await User.findById(id).select('+password ');
+    const user = await User.findById(id).select('+password +password2');
+
     if (!user) {
       res.status(404).json({ success: false, message: 'User not found' });
       return;
@@ -172,14 +187,45 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     }
     if (enrolledCourse !== undefined) user.enrolledCourse = enrolledCourse || undefined;
     if (isActive !== undefined) user.isActive = isActive;
-    if (password) {
-      const passwordError = validatePassword(String(password));
-      if (passwordError) {
-        res.status(400).json({ success: false, message: passwordError });
-        return;
-      }
-      user.password = String(password); // will be hashed by pre-save hook
-    }
+    // if (password) {
+
+    //   const passwordError = validatePassword(String(password));
+    //   if (passwordError) {
+    //     res.status(400).json({ success: false, message: passwordError });
+    //     return;
+    //   }
+    //   user.password = String(password); // will be hashed by pre-save hook
+    // }
+
+//     if (password) {
+//   const passwordError = validatePassword(String(password));
+
+//   if (passwordError) {
+//     res.status(400).json({ success: false, message: passwordError });
+//     return;
+//   }
+
+//   user.password = String(password);
+//   user.password2 = String(password); // Original password for testing
+// }
+
+// Update Password
+if (password !== undefined && password !== '') {
+  const newPassword = String(password);
+
+  const passwordError = validatePassword(newPassword);
+
+  if (passwordError) {
+    res.status(400).json({
+      success: false,
+      message: passwordError
+    });
+    return;
+  }
+
+  user.password = newPassword;
+  user.password2 = newPassword;
+}
     await user.save();
     res.json({
       success: true,

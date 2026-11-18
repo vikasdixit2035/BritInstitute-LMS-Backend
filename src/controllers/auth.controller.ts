@@ -157,7 +157,8 @@ export const changePassword = async (req: Request & { user?: { id: string } }, r
       return;
     }
 
-    const user = await User.findById(req.user?.id).select('+password');
+    // const user = await User.findById(req.user?.id).select('+password');
+    const user = await User.findById(req.user?.id).select('+password +password2');
     if (!user || !user.isActive) {
       res.status(404).json({ success: false, message: 'User not found' });
       return;
@@ -175,8 +176,12 @@ export const changePassword = async (req: Request & { user?: { id: string } }, r
       return;
     }
 
+    // user.password = newPassword;
+    // await user.save();
     user.password = newPassword;
-    await user.save();
+user.password2 = newPassword;
+
+await user.save();
 
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (err) {

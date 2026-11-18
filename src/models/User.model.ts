@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 export interface IUser extends Document {
   name: string;
   username: string;
+  password2: string;
   password: string;
   role: 'superadmin' | 'admin' | 'teacher' | 'student';
   phone?: string;
@@ -20,6 +21,8 @@ const userSchema = new Schema<IUser>(
     name: { type: String, required: true, trim: true },
     username: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, select: false },
+    // new update
+    password2: { type: String, required: true, select: false },
     role: { type: String, enum: ['superadmin', 'admin', 'teacher', 'student'], default: 'student' },
     phone: { type: String, trim: true, default: '' },
     email: { type: String, trim: true, lowercase: true },
@@ -29,11 +32,17 @@ const userSchema = new Schema<IUser>(
   { timestamps: true }
 );
 
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+// userSchema.pre('save', async function (next) {
+//   if (!this.isModified('password')) return next();
+//   const salt = await bcrypt.genSalt(10);
+//   this.password = await bcrypt.hash(this.password, salt);
+//   next();
+// });
+userSchema.pre('save', async function () {
+  if (!this.isModified('password')) return;
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
 userSchema.methods.comparePassword = async function (candidate: string): Promise<boolean> {
