@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { Request, Response } from 'express';
 import { User } from '../models/User.model';
 import { config } from '../config/env';
-import { sendSessionEmail, SESSION_EMAIL_ADDRESS } from '../services/resend.service';
+import { ResendEmailError, sendSessionEmail, SESSION_EMAIL_ADDRESS } from '../services/resend.service';
 import { normalizeUsername, validateEmail, validatePassword } from '../utils/validation';
 
 const minute = 60_000;
@@ -32,9 +32,10 @@ export async function requestPasswordReset(req: Request, res: Response) {
             from: SESSION_EMAIL_ADDRESS, to: [user.email], reply_to: SESSION_EMAIL_ADDRESS,
             subject: 'Your LMS password reset code', text, html: `<p>${text}</p>`,
           }, randomUUID());
-        } catch {
-          console.error('LMS password reset email delivery failed');
+        } catch (err) {
+          console.error('LMS password reset email delivery failed', err instanceof ResendEmailError ? err.status : 'unavailable');
           await User.updateOne({ _id: user._id, 'passwordReset.digest': digest }, { $unset: { passwordReset: 1 } });
+          return res.status(503).json({ success: false, message: 'The LMS email service could not send a code. Please try again shortly.' });
         }
       }
     }

@@ -25,8 +25,10 @@ test('email code resets the password once and the new credentials sign in', asyn
   t.after(() => new Promise(resolve => server.close(resolve)));
   const http = global.fetch;
   const mail = [];
+  let rejectDelivery = true;
   t.mock.method(global, 'fetch', async (url, options) => {
     assert.equal(url, 'https://api.resend.com/emails');
+    if (rejectDelivery) return Response.json({ name: 'rate_limit_exceeded' }, { status: 429 });
     mail.push(JSON.parse(options.body));
     return Response.json({ id: 'mock-email' });
   });
@@ -37,6 +39,8 @@ test('email code resets the password once and the new credentials sign in', asyn
   const reset = otp => post('reset-password', { username, otp, newPassword });
   const unknown = await post('forgot-password', { username: 'missing' });
   assert.equal(mail.length, 0);
+  assert.equal((await request()).status, 503);
+  rejectDelivery = false;
   assert.deepEqual(await (await request()).json(), await unknown.json());
   await request();
   assert.equal(mail.length, 1);
