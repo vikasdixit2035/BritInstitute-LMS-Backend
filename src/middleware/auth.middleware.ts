@@ -21,15 +21,35 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, config.jwtSecret) as { id: string; role: string; username: string; sessionId?: string };
+    const decoded = jwt.verify(token, config.jwtSecret) as {
+      id: string;
+      role: string;
+      username: string;
+      sessionId?: string;
+    };
 
     const user = await User.findById(decoded.id);
-    if (!user || !user.isActive) {
-      res.status(401).json({ success: false, message: 'User not found or inactive' });
+    if (!user) {
+      res.status(401).json({ success: false, message: 'User not found' });
       return;
     }
 
-    req.user = { id: decoded.id, role: decoded.role, username: decoded.username, sessionId: decoded.sessionId };
+    // Instantly block active sessions when account is deactivated
+    if (!user.isActive) {
+      res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_DEACTIVATED',
+        message: 'Your account has been deactivated. Access to LMS is revoked.',
+      });
+      return;
+    }
+
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+      username: decoded.username,
+      sessionId: decoded.sessionId,
+    };
     next();
   } catch {
     res.status(401).json({ success: false, message: 'Invalid token' });

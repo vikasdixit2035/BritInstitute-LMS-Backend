@@ -18,15 +18,12 @@ import studentPortalRoutes from './routes/studentPortal.routes';
 import foundationRoutes from './routes/foundation.routes';
 import studyMaterialRoutes from './routes/studyMaterial.routes';
 import projectRoutes from './routes/project.routes';
+import placementDriveRoutes from './routes/placementDriveRoutes';
 import { startAttendanceJob } from './jobs/attendance.job';
 import { startBookingEmailJob } from './jobs/bookingEmail.job';
-<<<<<<< HEAD
 
 export const app: Application = express();
-=======
-import placementDriveRoutes from './routes/placementDriveRoutes';
-const app: Application = express();
->>>>>>> ba70343 (final commit)
+
 const allowedOrigins = Array.from(new Set([
   config.frontendUrl,
   'http://localhost:5173',

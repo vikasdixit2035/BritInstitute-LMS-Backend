@@ -135,13 +135,13 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     const username = req.body.username !== undefined ? normalizeUsername(req.body.username) : undefined;
     const normalizedPhone = req.body.phone !== undefined ? normalizePhone(req.body.phone) : undefined;
     const normalizedEmail = req.body.email !== undefined ? normalizeEmail(req.body.email) : undefined;
-    // const user = await User.findById(id).select('+password ');
-    const user = await User.findById(id).select('+password +password2');
 
+    const user = await User.findById(id).select('+password +password2');
     if (!user) {
       res.status(404).json({ success: false, message: 'User not found' });
       return;
     }
+
     if (name !== undefined) {
       if (!name) {
         res.status(400).json({ success: false, message: 'Name is required' });
@@ -149,6 +149,7 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
       }
       user.name = name;
     }
+
     if (username && username.toLowerCase() !== user.username) {
       const usernameError = validateUsername(username);
       if (usernameError) {
@@ -162,6 +163,7 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
       }
       user.username = username;
     }
+
     if (req.body.email !== undefined) {
       if (normalizedEmail) {
         const emailError = validateEmail(normalizedEmail);
@@ -177,6 +179,7 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
       }
       user.email = normalizedEmail || undefined;
     }
+
     if (req.body.phone !== undefined) {
       const phoneError = validatePhone(normalizedPhone || '');
       if (phoneError) {
@@ -185,48 +188,44 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
       }
       user.phone = normalizedPhone || '';
     }
+
     if (enrolledCourse !== undefined) user.enrolledCourse = enrolledCourse || undefined;
-    if (isActive !== undefined) user.isActive = isActive;
-    // if (password) {
 
-    //   const passwordError = validatePassword(String(password));
-    //   if (passwordError) {
-    //     res.status(400).json({ success: false, message: passwordError });
-    //     return;
-    //   }
-    //   user.password = String(password); // will be hashed by pre-save hook
-    // }
+    if (isActive !== undefined) {
+      const nextActive = Boolean(isActive);
+      user.isActive = nextActive;
 
-//     if (password) {
-//   const passwordError = validatePassword(String(password));
+      // Immediately end active LMS sessions when deactivated
+      if (!nextActive) {
+        const now = new Date();
+        await UserSession.updateMany(
+          { user: user._id, status: 'active' },
+          {
+            $set: {
+              status: 'expired',
+              logoutAt: now,
+              lastActiveAt: now,
+              logoutReason: 'deactivated_by_admin',
+            },
+          }
+        );
+      }
+    }
 
-//   if (passwordError) {
-//     res.status(400).json({ success: false, message: passwordError });
-//     return;
-//   }
+    if (password !== undefined && password !== '') {
+      const newPassword = String(password);
+      const passwordError = validatePassword(newPassword);
+      if (passwordError) {
+        res.status(400).json({ success: false, message: passwordError });
+        return;
+      }
+      user.password = newPassword;
+      user.password2 = newPassword;
+    }
 
-//   user.password = String(password);
-//   user.password2 = String(password); // Original password for testing
-// }
+    // validateModifiedOnly prevents 500 validation crashes on older records missing password2
+    await user.save({ validateModifiedOnly: true });
 
-// Update Password
-if (password !== undefined && password !== '') {
-  const newPassword = String(password);
-
-  const passwordError = validatePassword(newPassword);
-
-  if (passwordError) {
-    res.status(400).json({
-      success: false,
-      message: passwordError
-    });
-    return;
-  }
-
-  user.password = newPassword;
-  user.password2 = newPassword;
-}
-    await user.save();
     res.json({
       success: true,
       user: {
@@ -237,7 +236,7 @@ if (password !== undefined && password !== '') {
         isActive: user.isActive,
         phone: user.phone,
         email: user.email,
-      }
+      },
     });
   } catch (err) {
     res.status(500).json({ success: false, message: getErrorMessage(err) });

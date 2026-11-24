@@ -5,8 +5,6 @@ import { UserSession } from '../models/UserSession.model';
 import { config } from '../config/env';
 import { getErrorMessage, normalizeUsername, validatePassword } from '../utils/validation';
 
-
-
 const getSessionDurationSeconds = (loginAt: Date, endAt = new Date()) =>
   Math.max(0, Math.floor((endAt.getTime() - loginAt.getTime()) / 1000));
 
@@ -33,8 +31,18 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const user = await User.findOne({ username }).select('+password');
-    if (!user || !user.isActive) {
+    if (!user) {
       res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return;
+    }
+
+    // Block deactivated users from logging in with a clear status & message
+    if (!user.isActive) {
+      res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_DEACTIVATED',
+        message: 'Your account has been deactivated. Please contact the Super Admin.',
+      });
       return;
     }
 
@@ -77,7 +85,10 @@ export const getSessionConfig = (_req: Request, res: Response): void => {
   res.json({ success: true, inactivityTimeoutMinutes: getInactivityTimeoutMinutes() });
 };
 
-export const heartbeat = async (req: Request & { user?: { id: string; sessionId?: string } }, res: Response): Promise<void> => {
+export const heartbeat = async (
+  req: Request & { user?: { id: string; sessionId?: string } },
+  res: Response
+): Promise<void> => {
   try {
     const sessionId = req.user?.sessionId || req.body.sessionId;
     if (!sessionId) {
@@ -102,7 +113,10 @@ export const heartbeat = async (req: Request & { user?: { id: string; sessionId?
   }
 };
 
-export const logoutSession = async (req: Request & { user?: { id: string; sessionId?: string } }, res: Response): Promise<void> => {
+export const logoutSession = async (
+  req: Request & { user?: { id: string; sessionId?: string } },
+  res: Response
+): Promise<void> => {
   try {
     const sessionId = req.user?.sessionId || req.body.sessionId;
     const reason = req.body.reason === 'inactivity' ? 'inactivity' : 'manual';
@@ -159,10 +173,18 @@ export const changePassword = async (req: Request & { user?: { id: string } }, r
       return;
     }
 
-    // const user = await User.findById(req.user?.id).select('+password');
     const user = await User.findById(req.user?.id).select('+password +password2');
-    if (!user || !user.isActive) {
+    if (!user) {
       res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    if (!user.isActive) {
+      res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_DEACTIVATED',
+        message: 'Your account has been deactivated.',
+      });
       return;
     }
 
@@ -178,12 +200,10 @@ export const changePassword = async (req: Request & { user?: { id: string } }, r
       return;
     }
 
-    // user.password = newPassword;
-    // await user.save();
     user.password = newPassword;
-user.password2 = newPassword;
+    user.password2 = newPassword;
 
-await user.save();
+    await user.save();
 
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (err) {

@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { User } from '../models/User.model';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { UserSession } from '../models/UserSession.model';
 import {
   getErrorMessage,
   getDuplicateKeyMessage,
@@ -41,6 +42,7 @@ export const createTeacher = async (req: AuthRequest, res: Response): Promise<vo
       name,
       username,
       password,
+      password2: password,
       role: 'teacher',
       isActive: true,
     });
@@ -77,20 +79,23 @@ export const updateTeacher = async (req: AuthRequest, res: Response): Promise<vo
     const { password, isActive } = req.body;
     const name = req.body.name !== undefined ? normalizeName(req.body.name) : undefined;
     const username = req.body.username !== undefined ? normalizeUsername(req.body.username) : undefined;
-    const teacher = await User.findOne({ _id: id, role: 'teacher' }).select('+password');
+    const teacher = await User.findOne({ _id: id, role: 'teacher' }).select('+password +password2');
 
     if (!teacher) {
       res.status(404).json({ success: false, message: 'Teacher not found' });
       return;
     }
 
+    const updates: Record<string, unknown> = {};
+
     if (name !== undefined) {
       if (!name) {
         res.status(400).json({ success: false, message: 'Name is required' });
         return;
       }
-      teacher.name = name;
+      updates.name = name;
     }
+
     if (username && username !== teacher.username) {
       const usernameError = validateUsername(username);
       if (usernameError) {
@@ -102,27 +107,74 @@ export const updateTeacher = async (req: AuthRequest, res: Response): Promise<vo
         res.status(409).json({ success: false, message: 'Username already taken' });
         return;
       }
-      teacher.username = username;
+      updates.username = username;
     }
-    if (isActive !== undefined) teacher.isActive = isActive;
-    if (password) {
-      const passwordError = validatePassword(String(password));
+
+    if (isActive !== undefined) {
+      const nextActive = Boolean(isActive);
+      updates.isActive = nextActive;
+
+      // Instantly terminate any active LMS sessions when deactivated
+      if (!nextActive) {
+        const now = new Date();
+        await UserSession.updateMany(
+          { user: teacher._id, status: 'active' },
+          {
+            $set: {
+              status: 'expired',
+              logoutAt: now,
+              lastActiveAt: now,
+              logoutReason: 'deactivated_by_admin',
+            },
+          }
+        );
+      }
+    }
+
+    // If password is being updated, set password + password2 and call .save() to trigger hashing
+    if (password !== undefined && password !== '') {
+      const newPassword = String(password);
+      const passwordError = validatePassword(newPassword);
       if (passwordError) {
         res.status(400).json({ success: false, message: passwordError });
         return;
       }
-      teacher.password = String(password);
+
+      Object.assign(teacher, updates);
+      teacher.password = newPassword;
+      teacher.password2 = newPassword;
+      await teacher.save();
+
+      res.json({
+        success: true,
+        message: `Teacher ${teacher.isActive ? 'activated' : 'deactivated'} successfully`,
+        teacher: {
+          id: teacher._id,
+          name: teacher.name,
+          username: teacher.username,
+          role: teacher.role,
+          isActive: teacher.isActive,
+        },
+      });
+      return;
     }
-    await teacher.save();
+
+    // For Activate/Deactivate toggles or name/username edits without password change
+    const updatedTeacher = await User.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      { new: true }
+    );
 
     res.json({
       success: true,
+      message: `Teacher ${updatedTeacher!.isActive ? 'activated' : 'deactivated'} successfully`,
       teacher: {
-        id: teacher._id,
-        name: teacher.name,
-        username: teacher.username,
-        role: teacher.role,
-        isActive: teacher.isActive,
+        id: updatedTeacher!._id,
+        name: updatedTeacher!.name,
+        username: updatedTeacher!.username,
+        role: updatedTeacher!.role,
+        isActive: updatedTeacher!.isActive,
       },
     });
   } catch (err) {
