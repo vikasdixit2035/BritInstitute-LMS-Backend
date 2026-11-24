@@ -20,8 +20,13 @@ import studyMaterialRoutes from './routes/studyMaterial.routes';
 import projectRoutes from './routes/project.routes';
 import { startAttendanceJob } from './jobs/attendance.job';
 import { startBookingEmailJob } from './jobs/bookingEmail.job';
+<<<<<<< HEAD
 
 export const app: Application = express();
+=======
+import placementDriveRoutes from './routes/placementDriveRoutes';
+const app: Application = express();
+>>>>>>> ba70343 (final commit)
 const allowedOrigins = Array.from(new Set([
   config.frontendUrl,
   'http://localhost:5173',
@@ -64,6 +69,7 @@ app.use('/api/student-portal', studentPortalRoutes);
 app.use('/api/foundation', foundationRoutes);
 app.use('/api/study-materials', studyMaterialRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/placement-drive', placementDriveRoutes);
 
 // ─── 404 ──────────────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {

@@ -5,6 +5,8 @@ import { UserSession } from '../models/UserSession.model';
 import { config } from '../config/env';
 import { getErrorMessage, normalizeUsername, validatePassword } from '../utils/validation';
 
+
+
 const getSessionDurationSeconds = (loginAt: Date, endAt = new Date()) =>
   Math.max(0, Math.floor((endAt.getTime() - loginAt.getTime()) / 1000));
 
